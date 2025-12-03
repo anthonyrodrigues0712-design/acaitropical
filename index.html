@@ -10,6 +10,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <link rel="stylesheet" href="styles.css" />
+
   <!-- Firebase (módulo) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -22,32 +23,30 @@
       doc
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // ---- CONFIGURE AQUI SUAS CHAVES DO FIREBASE ----
     window.firebaseConfig = {
-      apiKey: "SUA_API_KEY",
-      authDomain: "SEU_DOMINIO.firebaseapp.com",
-      projectId: "ID_DO_SEU_PROJETO",
-      storageBucket: "SEU_BUCKET.appspot.com",
-      messagingSenderId: "ID",
-      appId: "APP_ID"
-    };
-    // ------------------------------------------------
+  apiKey: "AIzaSyAOC1m6oYNLxiRUbP5VqhTPVadNYqOvqMg",
+  authDomain: "acai-projeto.firebaseapp.com",
+  projectId: "acai-projeto",
+  storageBucket: "acai-projeto.firebasestorage.app",
+  messagingSenderId: "606846834152",
+  appId: "1:606846834152:web:6d7e2b4457ab56bb15405d",
+  measurementId: "G-9DQPBBNMDB"
+};
 
     const app = initializeApp(window.firebaseConfig);
     window.dbOnline = getFirestore(app);
 
-    // exportar funções para o escopo global (utilizadas no script não-module)
     window._fb_collection = collection;
     window._fb_getDocs = getDocs;
     window._fb_setDoc = setDoc;
     window._fb_doc = doc;
     window._fb_addDoc = addDoc;
-    // a propriedade dbOnline já está em window.dbOnline
   </script>
-
 </head>
 
 <body>
+  <!-- seu HTML permanece igual -->
+
   <header class="header">
     <div class="header-inner" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
       <div>
