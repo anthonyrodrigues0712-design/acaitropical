@@ -6,47 +6,33 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Painel de Vendas - Açaí Tropical (IndexedDB + Login)</title>
 
+
   <!-- jsPDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <link rel="stylesheet" href="styles.css" />
-
-  <!-- Firebase (módulo) -->
+  <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import {
-      getFirestore,
-      collection,
-      getDocs,
-      addDoc,
-      setDoc,
-      doc
-    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, addDoc, setDoc, doc }
+      from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     window.firebaseConfig = {
-  apiKey: "AIzaSyAOC1m6oYNLxiRUbP5VqhTPVadNYqOvqMg",
-  authDomain: "acai-projeto.firebaseapp.com",
-  projectId: "acai-projeto",
-  storageBucket: "acai-projeto.firebasestorage.app",
-  messagingSenderId: "606846834152",
-  appId: "1:606846834152:web:6d7e2b4457ab56bb15405d",
-  measurementId: "G-9DQPBBNMDB"
-};
+      apiKey: "SUA_API_KEY",
+      authDomain: "SEU_DOMINIO.firebaseapp.com",
+      projectId: "ID_DO_SEU_PROJETO",
+      storageBucket: "SEU_BUCKET.appspot.com",
+      messagingSenderId: "ID",
+      appId: "APP_ID"
+    };
 
     const app = initializeApp(window.firebaseConfig);
     window.dbOnline = getFirestore(app);
-
-    window._fb_collection = collection;
-    window._fb_getDocs = getDocs;
-    window._fb_setDoc = setDoc;
-    window._fb_doc = doc;
-    window._fb_addDoc = addDoc;
   </script>
+
 </head>
 
 <body>
-  <!-- seu HTML permanece igual -->
-
   <header class="header">
     <div class="header-inner" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
       <div>
@@ -303,108 +289,38 @@
         });
       }
 
-      // keys locais
       const USERS_KEY = "users_acai";
       const LOGGED_KEY = "logged_user_acai";
 
-      /* -----------------------------
-         Firestore helper (usa funções exportadas pelo módulo)
-         ----------------------------- */
       async function getUsersOnline() {
-        try {
-          const snap = await window._fb_getDocs(window._fb_collection(window.dbOnline, "users"));
-          const users = [];
-          snap.forEach(d => users.push(d.data()));
-          return users;
-        } catch (err) {
-          console.warn('Não foi possível buscar usuários online:', err);
-          return []; // retornar array vazio ao falhar
-        }
+        const snap = await getDocs(collection(window.dbOnline, "users"));
+        const users = [];
+        snap.forEach(doc => users.push(doc.data()));
+        return users;
       }
 
       async function createUserOnline(username, password, name) {
-        try {
-          await window._fb_setDoc(window._fb_doc(window.dbOnline, "users", username), {
-            username,
-            password,
-            name
-          });
-          return true;
-        } catch (err) {
-          console.error('Erro criando usuário online:', err);
-          throw err;
-        }
+        await setDoc(doc(window.dbOnline, "users", username), {
+          username,
+          password,
+          name
+        });
       }
 
       async function loginOnline(username, password) {
-        try {
-          const snap = await window._fb_getDocs(window._fb_collection(window.dbOnline, "users"));
-          let found = null;
-          snap.forEach(d => {
-            const u = d.data();
-            if (u.username === username && u.password === password) {
-              found = u;
-            }
-          });
-          return found;
-        } catch (err) {
-          console.warn('Falha ao consultar usuários online:', err);
-          return null;
-        }
+        const snap = await getDocs(collection(window.dbOnline, "users"));
+        let found = null;
+
+        snap.forEach(d => {
+          const u = d.data();
+          if (u.username === username && u.password === password) {
+            found = u;
+          }
+        });
+
+        return found;
       }
 
-      // vendas online
-      async function fetchSalesOnline() {
-        try {
-          const snap = await window._fb_getDocs(window._fb_collection(window.dbOnline, "sales"));
-          const arr = [];
-          snap.forEach(d => {
-            const data = d.data();
-            arr.push(data);
-          });
-          return arr;
-        } catch (err) {
-          console.warn('Falha ao buscar vendas online:', err);
-          return [];
-        }
-      }
-
-      async function pushSaleOnline(sale) {
-        try {
-          // usa setDoc com id customizado (sale.id) para manter id consistente
-          await window._fb_setDoc(window._fb_doc(window.dbOnline, "sales", sale.id), sale);
-          return true;
-        } catch (err) {
-          console.warn('Falha ao enviar venda para Firestore:', err);
-          return false;
-        }
-      }
-
-      async function fetchReportsOnline() {
-        try {
-          const snap = await window._fb_getDocs(window._fb_collection(window.dbOnline, "reports"));
-          const arr = [];
-          snap.forEach(d => arr.push(d.data()));
-          return arr;
-        } catch (err) {
-          console.warn('Falha ao buscar reports online:', err);
-          return [];
-        }
-      }
-
-      async function pushReportOnline(report) {
-        try {
-          await window._fb_setDoc(window._fb_doc(window.dbOnline, "reports", report.id), report);
-          return true;
-        } catch (err) {
-          console.warn('Falha ao enviar report para Firestore:', err);
-          return false;
-        }
-      }
-
-      /* -----------------------------
-         Local storage helpers (mantidos para sessão local)
-         ----------------------------- */
       function getUsers() {
         try {
           return JSON.parse(localStorage.getItem(USERS_KEY)) || [];
@@ -431,50 +347,6 @@
 
       function clearLoggedUser() {
         localStorage.removeItem(LOGGED_KEY);
-      }
-
-      /* -----------------------------
-         Seeding / compatibilidade
-         ----------------------------- */
-      function seedUsersIfNeeded() {
-        try {
-          const raw = localStorage.getItem(USERS_KEY);
-          if (!raw) {
-            localStorage.setItem(USERS_KEY, JSON.stringify([]));
-          }
-        } catch (err) {
-          console.warn('seedUsersIfNeeded falhou:', err);
-        }
-      }
-
-      /* -----------------------------
-         Sync logic: baixar do online e salvar no IndexedDB
-         ----------------------------- */
-      async function syncFromOnline() {
-        try {
-          // buscar vendas e reports do firestore
-          const onlineSales = await fetchSalesOnline();
-          const onlineReports = await fetchReportsOnline();
-
-          // gravar cada venda/report no IndexedDB (put para substituir/atualizar)
-          for (const s of onlineSales) {
-            try {
-              await dbPut(STORE_SALES, s);
-            } catch (e) { console.warn('dbPut sale falhou:', e); }
-          }
-          for (const r of onlineReports) {
-            try {
-              await dbPut(STORE_REPORTS, r);
-            } catch (e) { console.warn('dbPut report falhou:', e); }
-          }
-
-          // recarregar estado local
-          await loadStateFromDB();
-          updateUI();
-          console.log('Sincronização online -> local concluída (', onlineSales.length, 'vendas )');
-        } catch (err) {
-          console.warn('syncFromOnline falhou:', err);
-        }
       }
 
       /* -----------------------------
@@ -516,6 +388,7 @@
       /* -----------------------------
          App logic (uses IndexedDB)
          ----------------------------- */
+
       const PRICE_SUGGEST = { agua: 3.00, refri: 5.00 };
 
       let sales = [];
@@ -568,14 +441,12 @@
       /* Init */
       async function init() {
         try {
-          seedUsersIfNeeded(); // garante que a função exista e não quebre init
+          seedUsersIfNeeded();
           await openDB();
           await migrateLocalStorageIfNeeded();
           await loadStateFromDB();
           bindEvents();
           restoreLogin();
-          // sincroniza do online para local (se Firestore configurado)
-          await syncFromOnline();
           updateUI();
         } catch (err) {
           console.error('Erro inicializando app:', err);
@@ -645,12 +516,10 @@
       function restoreLogin() {
         const u = getLoggedUser();
         if (u && u.username) {
-          // se há usuário salvo localmente, tenta restaurar a sessão (sem validação extra)
           currentUser = u;
           vendedorNomeEl.textContent = currentUser.name || currentUser.username;
           showLoginLayer(false);
         } else {
-          // força pedir login
           showLoginLayer(true);
         }
       }
@@ -684,29 +553,22 @@
         const username = loginUserInput.value.trim() || "vendedor" + Math.floor(Math.random() * 999);
         const password = loginPassInput.value.trim() || "1234";
 
-        // tentar criar usuário online (se possível)
-        try {
-          const users = await getUsersOnline();
-          if (users.some(u => u.username === username)) {
-            loginError.textContent = "Usuário já existe";
-            loginError.style.display = "block";
-            return;
-          }
-
-          await createUserOnline(username, password, username);
-
-          alert(`Usuário criado: ${username} (senha: ${password})`);
-        } catch (err) {
-          alert('Erro ao criar usuário online. Verifique o console.');
-          console.error(err);
+        const users = await getUsersOnline();
+        if (users.some(u => u.username === username)) {
+          loginError.textContent = "Usuário já existe";
+          loginError.style.display = "block";
+          return;
         }
+
+        await createUserOnline(username, password, username);
+
+        alert(`Usuário criado: ${username} (senha: ${password})`);
       }
 
       async function doLogin() {
         const user = loginUserInput.value.trim();
         const pass = loginPassInput.value.trim();
 
-        // tenta login online (se Firestore disponível)
         const found = await loginOnline(user, pass);
 
         if (!found) {
@@ -716,13 +578,11 @@
 
         currentUser = found;
         setLoggedUser(found); // ainda salva local, mas só para manter sessão
-        vendedorNomeEl.textContent = currentUser.name || currentUser.username;
+        vendedorNomeEl.textContent = currentUser.name;
         showLoginLayer(false);
-
-        // após login, sincroniza com o Firestore (garante que vê as vendas mais recentes)
-        await syncFromOnline();
         updateUI();
       }
+
 
       function onProductChange() {
         const prod = productSelect.value;
@@ -768,17 +628,12 @@
           sellerName: currentUser.name || currentUser.username
         };
 
-        // primeiro salva local
         try {
           await dbAdd(STORE_SALES, sale);
         } catch (err) {
           // se já existir, faz put
-          try { await dbPut(STORE_SALES, sale); } catch (e) { console.warn('dbPut falhou:', e); }
+          await dbPut(STORE_SALES, sale);
         }
-
-        // tenta enviar para Firestore; se falhar continuará no local e será sincronizado depois
-        const ok = await pushSaleOnline(sale);
-        if (!ok) console.warn('Venda gravada localmente, sem conexão para enviar ao Firestore.');
 
         sales.unshift(sale);
         saleMsg.textContent = `Venda registrada: ${productLabel(prod)} — ${qty} x ${money(unit)} = ${money(total)} (${paymentMethod})`;
@@ -814,11 +669,6 @@
         } catch (err) {
           await dbPut(STORE_REPORTS, report);
         }
-
-        // push para firestore (não crítico)
-        const ok = await pushReportOnline(report);
-        if (!ok) console.warn('Report gravado localmente, sem conexão para enviar ao Firestore.');
-
         reports.unshift(report);
         updateUI();
         downloadReportAsPDF(report);
