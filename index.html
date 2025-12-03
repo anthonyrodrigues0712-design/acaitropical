@@ -354,6 +354,55 @@
         }
       }
 
+      // vendas online
+      async function fetchSalesOnline() {
+        try {
+          const snap = await window._fb_getDocs(window._fb_collection(window.dbOnline, "sales"));
+          const arr = [];
+          snap.forEach(d => {
+            const data = d.data();
+            arr.push(data);
+          });
+          return arr;
+        } catch (err) {
+          console.warn('Falha ao buscar vendas online:', err);
+          return [];
+        }
+      }
+
+      async function pushSaleOnline(sale) {
+        try {
+          // usa setDoc com id customizado (sale.id) para manter id consistente
+          await window._fb_setDoc(window._fb_doc(window.dbOnline, "sales", sale.id), sale);
+          return true;
+        } catch (err) {
+          console.warn('Falha ao enviar venda para Firestore:', err);
+          return false;
+        }
+      }
+
+      async function fetchReportsOnline() {
+        try {
+          const snap = await window._fb_getDocs(window._fb_collection(window.dbOnline, "reports"));
+          const arr = [];
+          snap.forEach(d => arr.push(d.data()));
+          return arr;
+        } catch (err) {
+          console.warn('Falha ao buscar reports online:', err);
+          return [];
+        }
+      }
+
+      async function pushReportOnline(report) {
+        try {
+          await window._fb_setDoc(window._fb_doc(window.dbOnline, "reports", report.id), report);
+          return true;
+        } catch (err) {
+          console.warn('Falha ao enviar report para Firestore:', err);
+          return false;
+        }
+      }
+
       /* -----------------------------
          Local storage helpers (mantidos para sessão local)
          ----------------------------- */
@@ -388,7 +437,6 @@
       /* -----------------------------
          Seeding / compatibilidade
          ----------------------------- */
-      // evita erro por função inexistente; cria chave local vazia se necessário
       function seedUsersIfNeeded() {
         try {
           const raw = localStorage.getItem(USERS_KEY);
@@ -397,6 +445,36 @@
           }
         } catch (err) {
           console.warn('seedUsersIfNeeded falhou:', err);
+        }
+      }
+
+      /* -----------------------------
+         Sync logic: baixar do online e salvar no IndexedDB
+         ----------------------------- */
+      async function syncFromOnline() {
+        try {
+          // buscar vendas e reports do firestore
+          const onlineSales = await fetchSalesOnline();
+          const onlineReports = await fetchReportsOnline();
+
+          // gravar cada venda/report no IndexedDB (put para substituir/atualizar)
+          for (const s of onlineSales) {
+            try {
+              await dbPut(STORE_SALES, s);
+            } catch (e) { console.warn('dbPut sale falhou:', e); }
+          }
+          for (const r of onlineReports) {
+            try {
+              await dbPut(STORE_REPORTS, r);
+            } catch (e) { console.warn('dbPut report falhou:', e); }
+          }
+
+          // recarregar estado local
+          await loadStateFromDB();
+          updateUI();
+          console.log('Sincronização online -> local concluída (', onlineSales.length, 'vendas )');
+        } catch (err) {
+          console.warn('syncFromOnline falhou:', err);
         }
       }
 
@@ -497,6 +575,8 @@
           await loadStateFromDB();
           bindEvents();
           restoreLogin();
+          // sincroniza do online para local (se Firestore configurado)
+          await syncFromOnline();
           updateUI();
         } catch (err) {
           console.error('Erro inicializando app:', err);
@@ -639,6 +719,9 @@
         setLoggedUser(found); // ainda salva local, mas só para manter sessão
         vendedorNomeEl.textContent = currentUser.name || currentUser.username;
         showLoginLayer(false);
+
+        // após login, sincroniza com o Firestore (garante que vê as vendas mais recentes)
+        await syncFromOnline();
         updateUI();
       }
 
@@ -686,12 +769,17 @@
           sellerName: currentUser.name || currentUser.username
         };
 
+        // primeiro salva local
         try {
           await dbAdd(STORE_SALES, sale);
         } catch (err) {
           // se já existir, faz put
-          await dbPut(STORE_SALES, sale);
+          try { await dbPut(STORE_SALES, sale); } catch (e) { console.warn('dbPut falhou:', e); }
         }
+
+        // tenta enviar para Firestore; se falhar continuará no local e será sincronizado depois
+        const ok = await pushSaleOnline(sale);
+        if (!ok) console.warn('Venda gravada localmente, sem conexão para enviar ao Firestore.');
 
         sales.unshift(sale);
         saleMsg.textContent = `Venda registrada: ${productLabel(prod)} — ${qty} x ${money(unit)} = ${money(total)} (${paymentMethod})`;
@@ -727,6 +815,11 @@
         } catch (err) {
           await dbPut(STORE_REPORTS, report);
         }
+
+        // push para firestore (não crítico)
+        const ok = await pushReportOnline(report);
+        if (!ok) console.warn('Report gravado localmente, sem conexão para enviar ao Firestore.');
+
         reports.unshift(report);
         updateUI();
         downloadReportAsPDF(report);
