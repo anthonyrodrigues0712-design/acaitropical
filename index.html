@@ -3,9 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Painel de Vendas - Açaí Tropical (IndexedDB + Login)</title>
+  <title>Painel de Vendas - Açaí Tropical</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/5607/5607725.png" />
+
 </head>
 <body>
   <header class="header">
@@ -85,8 +87,8 @@
       <section class="panel right-panel">
         <div class="panel-header">
           <div>
-            <h3>Vendas recentes</h3>
-            <small class="muted">Mostrando até 5 últimas vendas</small>
+            <h3>Vendas</h3>
+            <small class="muted">Mostrando vendas filtradas (por data e forma)</small>
           </div>
           <div class="filter-row">
             <label for="paymentFilter" class="muted">Filtrar por forma:</label>
@@ -100,7 +102,7 @@
         </div>
         <div id="recentSales" class="sales-list"></div>
         <div class="panel-footer">
-          <button id="clearSalesBtn" class="danger-btn">Limpar histórico</button>
+          <button id="clearSalesBtn" class="danger-btn">Limpar histórico de vendas</button>
         </div>
       </section>
     </section>
@@ -154,7 +156,6 @@
       <p style="font-size:12px; color:var(--muted); margin-top:8px;">Se não há usuários, clique em "Criar usuário" para gerar um usuário demo.</p>
     </div>
   </div>
-
   <script>
   (function(){
     const DB_NAME='acaiDB';
@@ -385,11 +386,9 @@
       generateReportBtn.addEventListener('click',()=>{ if(!currentUser){ showLoginLayer(true); return; } handleGenerateReport(); });
       clearSalesBtn.addEventListener('click',async()=>{
         if(!currentUser){ showLoginLayer(true); return; }
-        if(!confirm('Limpar histórico apenas do usuário logado? Esta ação não pode ser desfeita.')) return;
+        if(!confirm('Limpar histórico apenas de vendas do usuário logado? Esta ação não pode ser desfeita.')) return;
         await dbDeleteBySeller(STORE_SALES,currentUser.username);
-        await dbDeleteBySeller(STORE_REPORTS,currentUser.username);
         sales=(await dbGetAll(STORE_SALES))||[];
-        reports=(await dbGetAll(STORE_REPORTS))||[];
         await computeDailyTotalsForAllDates();
         updateUI();
       });
@@ -519,7 +518,7 @@
         totalsPerSeller[s.seller]+=s.total;
       }
       const record={ key:dateStr, date:dateStr, total:+total.toFixed(2), perSeller:totalsPerSeller };
-      await dbPut(STORE_DAILY,record);
+      try{ await dbPut(STORE_DAILY,record); }catch(e){ console.warn('Falha ao gravar dailyTotals:',e); }
       await populateDateFilter();
       renderDailyTotalsList();
     }
@@ -557,7 +556,6 @@
     async function populateDateFilter(){
       const daily=await dbGetAll(STORE_DAILY);
       daily.sort((a,b)=>b.date.localeCompare(a.date));
-      const existing=[...dateFilter.options].map(o=>o.value);
       dateFilter.innerHTML='<option value="all">Todas as datas</option>';
       for(const d of daily){
         const opt=document.createElement('option');
@@ -649,15 +647,7 @@
         const pageWidth=doc.internal.pageSize.getWidth();
         const cw={produto:140,qtd:36,unit:60,total:60,forma:70,vendedor:90};
         const startX=margin;
-        const col={
-          produto:startX,
-          qtd:startX+cw.produto,
-          unit:startX+cw.produto+cw.qtd,
-          total:startX+cw.produto+cw.qtd+cw.unit,
-          forma:startX+cw.produto+cw.qtd+cw.unit+cw.total,
-          vendedor:startX+cw.produto+cw.qtd+cw.unit+cw.total+cw.forma,
-          hora:pageWidth-margin
-        };
+        const col={produto:startX,qtd:startX+cw.produto,unit:startX+cw.produto+cw.qtd,total:startX+cw.produto+cw.qtd+cw.unit,forma:startX+cw.produto+cw.qtd+cw.unit+cw.total,vendedor:startX+cw.produto+cw.qtd+cw.unit+cw.total+cw.forma,hora:pageWidth-margin};
         doc.setFontSize(10); doc.setFont(undefined,'bold');
         doc.text('Produto',col.produto,y);
         doc.text('Qtd',col.qtd+cw.qtd/2,y,{align:'center'});
@@ -730,7 +720,7 @@
       let filtered=[...sales].filter(s=> currentUser && s.seller===currentUser.username);
       if(filter!=='all') filtered=filtered.filter(s=>s.paymentMethod===filter);
       if(dateSel!=='all') filtered=filtered.filter(s=>dateKeyFromTs(s.ts)===dateSel);
-      const last=filtered.sort((a,b)=>b.ts-a.ts).slice(0,5);
+      const last=filtered.sort((a,b)=>b.ts-a.ts); // show all matching sales (no slice)
       recentSalesEl.innerHTML='';
       if(last.length===0){ recentSalesEl.innerHTML='<p class="muted">Nenhuma venda registrada.</p>'; return; }
       last.forEach(s=>{
@@ -816,4 +806,3 @@
   </script>
 </body>
 </html>
-
